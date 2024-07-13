@@ -11,6 +11,12 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeS
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Token} from "./Token.sol";
 
+import "forge-std/Test.sol";
+
+/**
+ * @title PredictionMarketHook
+ * @dev A contract to manage the prediction market using Uniswap v4 hooks.
+ */
 contract PredictionMarketHook is BaseHook {
     using PoolIdLibrary for PoolKey;
 
@@ -35,10 +41,22 @@ contract PredictionMarketHook is BaseHook {
     uint256 public marketStartTime;
     uint256 public marketDuration;
 
+    /**
+     * @dev Constructor to initialize the PredictionMarketHook contract.
+     * @param _poolManager The address of the Uniswap v4 PoolManager contract.
+     * @param _usdc The address of the USDC token contract.
+     */
     constructor(IPoolManager _poolManager, ERC20 _usdc) BaseHook(_poolManager) {
         usdc = _usdc;
     }
 
+    /**
+     * @dev Deploys the YES and NO tokens for the prediction market.
+     * @param yesName The name of the YES token.
+     * @param yesSymbol The symbol of the YES token.
+     * @param noName The name of the NO token.
+     * @param noSymbol The symbol of the NO token.
+     */
     function deployTokens(
         string memory yesName,
         string memory yesSymbol,
@@ -49,6 +67,10 @@ contract PredictionMarketHook is BaseHook {
         noToken = new Token(noName, noSymbol);
     }
 
+    /**
+     * @dev Returns the permissions for the hooks.
+     * @return The permissions for the hooks.
+     */
     function getHookPermissions()
         public
         pure
@@ -74,6 +96,11 @@ contract PredictionMarketHook is BaseHook {
             });
     }
 
+    /**
+     * @dev Initializes the market with zero balances and unresolved status.
+     * @param key The pool key.
+     * @return The selector of the function.
+     */
     function beforeInitialize(
         address,
         PoolKey calldata key,
@@ -87,27 +114,45 @@ contract PredictionMarketHook is BaseHook {
         return BaseHook.beforeInitialize.selector;
     }
 
+    /**
+     * @dev Sets the duration of the market.
+     * @param _duration The duration of the market.
+     */
     function setMarketDuration(uint256 _duration) external {
         marketDuration = _duration;
     }
 
+    /**
+     * @dev Sets the start time of the market.
+     * @param _startTime The start time of the market.
+     */
     function setMarketStartTime(uint256 _startTime) external {
         marketStartTime = _startTime;
     }
 
+    /**
+     * @dev Checks if the market is open.
+     * @return True if the market is open, false otherwise.
+     */
     function isMarketOpen() public view returns (bool) {
         return
             block.timestamp >= marketStartTime &&
             block.timestamp <= marketStartTime + marketDuration;
     }
 
+    /**
+     * @dev Updates the YES token balance for a user.
+     * @param sender The address of the user.
+     * @param key The pool key.
+     * @param amountUSDC The amount of USDC to spend on YES tokens.
+     */
     function updateYesTokenBalance(
         address sender,
-        PoolId poolId,
+        PoolKey calldata key,
         uint256 amountUSDC
     ) public {
         require(isMarketOpen(), "Market is not open");
-
+        PoolId poolId = key.toId();
         uint256 price = calculateYesPrice(poolId);
         require(price > 0, "Price must be greater than 0");
         uint256 amountYes = (amountUSDC * 1e18) / price;
@@ -119,15 +164,22 @@ contract PredictionMarketHook is BaseHook {
         yesBalances[poolId] += amountYes;
         userYesBalances[poolId][sender] += amountYes;
         yesToken.mint(address(this), amountYes); // Mint to the pool
+        donateTokensToPool(key, amountYes, 0); // Donate YES tokens to the pool
     }
 
+    /**
+     * @dev Updates the NO token balance for a user.
+     * @param sender The address of the user.
+     * @param key The pool key.
+     * @param amountUSDC The amount of USDC to spend on NO tokens.
+     */
     function updateNoTokenBalance(
         address sender,
-        PoolId poolId,
+        PoolKey calldata key,
         uint256 amountUSDC
     ) public {
         require(isMarketOpen(), "Market is not open");
-
+        PoolId poolId = key.toId();
         uint256 price = calculateNoPrice(poolId);
         require(price > 0, "Price must be greater than 0");
         uint256 amountNo = (amountUSDC * 1e18) / price;
@@ -139,8 +191,31 @@ contract PredictionMarketHook is BaseHook {
         noBalances[poolId] += amountNo;
         userNoBalances[poolId][sender] += amountNo;
         noToken.mint(address(this), amountNo); // Mint to the pool
+        donateTokensToPool(key, 0, amountNo); // Donate NO tokens to the pool
     }
 
+    /**
+     * @dev Donates tokens to the pool.
+     * @param key The pool key.
+     * @param amountYes The amount of YES tokens to donate.
+     * @param amountNo The amount of NO tokens to donate.
+     */
+    function donateTokensToPool(
+        PoolKey calldata key,
+        uint256 amountYes,
+        uint256 amountNo
+    ) internal {
+        yesToken.approve(address(poolManager), amountYes);
+        noToken.approve(address(poolManager), amountNo);
+
+        poolManager.donate(key, amountYes, amountNo, "");
+    }
+
+    /**
+     * @dev Resolves the market with the given outcome.
+     * @param key The pool key.
+     * @param outcome The outcome of the market (true for YES, false for NO).
+     */
     function resolveMarket(PoolKey calldata key, bool outcome) external {
         PoolId poolId = key.toId();
         require(!marketResolved[poolId], "Market already resolved");
@@ -153,6 +228,11 @@ contract PredictionMarketHook is BaseHook {
         totalSupply = outcome ? yesBalances[poolId] : noBalances[poolId];
     }
 
+    /**
+     * @dev Claims the reward for a user based on the market outcome.
+     * @param key The pool key.
+     * @param _claimFor The address of the user claiming the reward.
+     */
     function claimReward(PoolKey calldata key, address _claimFor) external {
         PoolId poolId = key.toId();
         require(marketResolved[poolId], "Market Not Resolved");
@@ -160,7 +240,9 @@ contract PredictionMarketHook is BaseHook {
 
         uint256 usdcBalance = usdc.balanceOf(address(this));
 
-        uint256 userBalance = marketOutcome[poolId]
+        bool outcome = marketOutcome[poolId];
+
+        uint256 userBalance = outcome
             ? userYesBalances[poolId][_claimFor]
             : userNoBalances[poolId][_claimFor];
         uint256 reward = (userBalance * usdcBalance) / totalSupply;
@@ -169,8 +251,17 @@ contract PredictionMarketHook is BaseHook {
             usdc.transfer(_claimFor, reward);
             totalSupply -= userBalance;
         }
+
+        if (outcome) userYesBalances[poolId][_claimFor] = 0;
+        else userNoBalances[poolId][_claimFor] = 0;
     }
 
+    /**
+     * @dev Calculates the price based on balance and supply.
+     * @param balance The balance of the token.
+     * @param supply The supply of the token.
+     * @return The calculated price.
+     */
     function _calculatePrice(
         uint256 balance,
         uint256 supply
@@ -181,109 +272,69 @@ contract PredictionMarketHook is BaseHook {
                 : ((balance * 1e18) / supply);
     }
 
+    /**
+     * @dev Calculates the price of YES tokens.
+     * @param poolId The pool ID.
+     * @return The calculated price of YES tokens.
+     */
     function calculateYesPrice(PoolId poolId) public view returns (uint256) {
         uint256 yesBalance = yesBalances[poolId];
         uint256 noSupply = noBalances[poolId]; // Use noBalances instead of noSupply
         return _calculatePrice(yesBalance, noSupply);
     }
 
+    /**
+     * @dev Calculates the price of NO tokens.
+     * @param poolId The pool ID.
+     * @return The calculated price of NO tokens.
+     */
     function calculateNoPrice(PoolId poolId) public view returns (uint256) {
         uint256 noBalance = noBalances[poolId];
         uint256 yesSupply = yesBalances[poolId]; // Use yesBalances instead of yesSupply
         return _calculatePrice(noBalance, yesSupply);
     }
 
+    /**
+     * @dev Reverts any swap attempts as swapping is not allowed in this market.
+     */
     function beforeSwap(
-        address sender,
-        PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
+        address,
+        PoolKey calldata,
+        IPoolManager.SwapParams calldata,
         bytes calldata
-    ) external override returns (bytes4, BeforeSwapDelta, uint24) {
-        PoolId poolId = key.toId();
-        require(!marketResolved[poolId], "Market already resolved");
-
-        if (params.zeroForOne) {
-            updateNoToYes(sender, poolId, uint256(params.amountSpecified));
-        } else {
-            updateYesToNo(sender, poolId, uint256(params.amountSpecified));
-        }
-
-        return (
-            BaseHook.beforeSwap.selector,
-            BeforeSwapDeltaLibrary.ZERO_DELTA,
-            0
-        );
+    ) external pure override returns (bytes4, BeforeSwapDelta, uint24) {
+        revert("Swapping is not allowed in this market");
     }
 
-    function updateYesToNo(
-        address sender,
-        PoolId poolId,
-        uint256 amountYes
-    ) public {
-        uint256 price = calculateNoPrice(poolId);
-        uint256 amountNo = (amountYes * price) / 1e18;
-
-        yesToken.burn(address(this), amountYes); // Burn from the pool
-        noToken.mint(address(this), amountNo); // Mint to the pool
-
-        if (userYesBalances[poolId][sender] == 0) {
-            yesTokenHolders[poolId].push(sender);
-        }
-        if (userNoBalances[poolId][sender] == 0) {
-            noTokenHolders[poolId].push(sender);
-        }
-
-        yesBalances[poolId] -= amountYes;
-        userYesBalances[poolId][sender] -= amountYes;
-
-        noBalances[poolId] += amountNo;
-        userNoBalances[poolId][sender] += amountNo;
-    }
-
-    function updateNoToYes(
-        address sender,
-        PoolId poolId,
-        uint256 amountNo
-    ) public {
-        uint256 price = calculateYesPrice(poolId);
-        uint256 amountYes = (amountNo * price) / 1e18;
-
-        noToken.burn(address(this), amountNo); // Burn from the pool
-        yesToken.mint(address(this), amountYes); // Mint to the pool
-
-        if (userNoBalances[poolId][sender] == 0) {
-            noTokenHolders[poolId].push(sender);
-        }
-        if (userYesBalances[poolId][sender] == 0) {
-            yesTokenHolders[poolId].push(sender);
-        }
-
-        noBalances[poolId] -= amountNo;
-        userNoBalances[poolId][sender] -= amountNo;
-
-        yesBalances[poolId] += amountYes;
-        userYesBalances[poolId][sender] += amountYes;
-    }
-
+    /**
+     * @dev Reverts any swap attempts as swapping is not allowed in this market.
+     */
     function afterSwap(
         address,
-        PoolKey calldata key,
+        PoolKey calldata,
         IPoolManager.SwapParams calldata,
         BalanceDelta,
         bytes calldata
-    ) external override returns (bytes4, int128) {
-        // Custom logic for after swap if needed
-        return (BaseHook.afterSwap.selector, 0);
+    ) external pure override returns (bytes4, int128) {
+        revert("Swapping is not allowed in this market");
     }
 
+    /**
+     * @dev Awards liquidity points based on the amount of liquidity added.
+     * @param sender The address of the user adding liquidity.
+     * @param key The pool key.
+     * @param params The liquidity parameters.
+     * @param delta The balance delta.
+     * @param data Additional data.
+     * @return The selector of the function and the balance delta.
+     */
     function afterAddLiquidity(
         address sender,
         PoolKey calldata key,
         IPoolManager.ModifyLiquidityParams calldata params,
         BalanceDelta delta,
-        bytes calldata
+        bytes calldata data
     ) external override returns (bytes4, BalanceDelta) {
-        PoolId poolId = key.toId();
         // Calculate points based on the amount of liquidity added
         uint256 liquidityAdded = uint256(params.liquidityDelta);
         liquidityPoints[sender] += liquidityAdded; // Award 1 point for each wei of liquidity added
