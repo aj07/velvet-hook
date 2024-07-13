@@ -10,7 +10,6 @@ import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Token} from "./Token.sol";
-import "forge-std/Test.sol";
 
 contract PredictionMarketHook is BaseHook {
     using PoolIdLibrary for PoolKey;
@@ -22,6 +21,8 @@ contract PredictionMarketHook is BaseHook {
 
     Token public yesToken;
     Token public noToken;
+    ERC20 public usdc;
+    uint256 public totalSupply;
 
     // Mappings to track user balances and maintain a list of users
     mapping(PoolId => mapping(address => uint256)) public userYesBalances;
@@ -34,7 +35,9 @@ contract PredictionMarketHook is BaseHook {
     uint256 public marketStartTime;
     uint256 public marketDuration;
 
-    constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
+    constructor(IPoolManager _poolManager, ERC20 _usdc) BaseHook(_poolManager) {
+        usdc = _usdc;
+    }
 
     function deployTokens(
         string memory yesName,
@@ -116,14 +119,6 @@ contract PredictionMarketHook is BaseHook {
         yesBalances[poolId] += amountYes;
         userYesBalances[poolId][sender] += amountYes;
         yesToken.mint(address(this), amountYes); // Mint to the pool
-
-        // Debugging
-        console.log("Updated Yes Token Balance");
-        console.log("Sender:", sender);
-        console.log("Amount USDC:", amountUSDC);
-        console.log("Price:", price);
-        console.log("Amount YES:", amountYes);
-        console.log("yesBalances[poolId]:", yesBalances[poolId]);
     }
 
     function updateNoTokenBalance(
@@ -144,53 +139,36 @@ contract PredictionMarketHook is BaseHook {
         noBalances[poolId] += amountNo;
         userNoBalances[poolId][sender] += amountNo;
         noToken.mint(address(this), amountNo); // Mint to the pool
-
-        // Debugging
-        console.log("Updated No Token Balance");
-        console.log("Sender:", sender);
-        console.log("Amount USDC:", amountUSDC);
-        console.log("Price:", price);
-        console.log("Amount NO:", amountNo);
-        console.log("noBalances[poolId]:", noBalances[poolId]);
     }
 
     function resolveMarket(PoolKey calldata key, bool outcome) external {
         PoolId poolId = key.toId();
         require(!marketResolved[poolId], "Market already resolved");
+        require(
+            block.timestamp > marketStartTime + marketDuration,
+            "Market duration not over"
+        );
         marketResolved[poolId] = true;
         marketOutcome[poolId] = outcome;
-
-        // Custom logic to distribute rewards
-        _distributeRewards(poolId, outcome);
+        totalSupply = outcome ? yesBalances[poolId] : noBalances[poolId];
     }
 
-    function _distributeRewards(PoolId poolId, bool outcome) internal {
-        uint256 totalSupply = outcome
-            ? yesBalances[poolId]
-            : noBalances[poolId];
+    function claimReward(PoolKey calldata key, address _claimFor) external {
+        PoolId poolId = key.toId();
+        require(marketResolved[poolId], "Market Not Resolved");
         require(totalSupply > 0, "No tokens to distribute");
 
-        // uint256 usdcBalance = usdc.balanceOf(address(this));
-        address[] memory accounts = _getAccounts(poolId, outcome);
+        uint256 usdcBalance = usdc.balanceOf(address(this));
 
-        for (uint256 i = 0; i < accounts.length; i++) {
-            address account = accounts[i];
-            uint256 userBalance = outcome
-                ? userYesBalances[poolId][account]
-                : userNoBalances[poolId][account];
-            uint256 reward = (userBalance * totalSupply) / totalSupply;
+        uint256 userBalance = marketOutcome[poolId]
+            ? userYesBalances[poolId][_claimFor]
+            : userNoBalances[poolId][_claimFor];
+        uint256 reward = (userBalance * usdcBalance) / totalSupply;
 
-            if (reward > 0) {
-                // usdc.transfer(account, reward);
-            }
+        if (reward > 0) {
+            usdc.transfer(_claimFor, reward);
+            totalSupply -= userBalance;
         }
-    }
-
-    function _getAccounts(
-        PoolId poolId,
-        bool outcome
-    ) internal view returns (address[] memory) {
-        return outcome ? yesTokenHolders[poolId] : noTokenHolders[poolId];
     }
 
     function _calculatePrice(
@@ -215,6 +193,89 @@ contract PredictionMarketHook is BaseHook {
         return _calculatePrice(noBalance, yesSupply);
     }
 
+    function beforeSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        bytes calldata
+    ) external override returns (bytes4, BeforeSwapDelta, uint24) {
+        PoolId poolId = key.toId();
+        require(!marketResolved[poolId], "Market already resolved");
+
+        if (params.zeroForOne) {
+            updateNoToYes(sender, poolId, uint256(params.amountSpecified));
+        } else {
+            updateYesToNo(sender, poolId, uint256(params.amountSpecified));
+        }
+
+        return (
+            BaseHook.beforeSwap.selector,
+            BeforeSwapDeltaLibrary.ZERO_DELTA,
+            0
+        );
+    }
+
+    function updateYesToNo(
+        address sender,
+        PoolId poolId,
+        uint256 amountYes
+    ) public {
+        uint256 price = calculateNoPrice(poolId);
+        uint256 amountNo = (amountYes * price) / 1e18;
+
+        yesToken.burn(address(this), amountYes); // Burn from the pool
+        noToken.mint(address(this), amountNo); // Mint to the pool
+
+        if (userYesBalances[poolId][sender] == 0) {
+            yesTokenHolders[poolId].push(sender);
+        }
+        if (userNoBalances[poolId][sender] == 0) {
+            noTokenHolders[poolId].push(sender);
+        }
+
+        yesBalances[poolId] -= amountYes;
+        userYesBalances[poolId][sender] -= amountYes;
+
+        noBalances[poolId] += amountNo;
+        userNoBalances[poolId][sender] += amountNo;
+    }
+
+    function updateNoToYes(
+        address sender,
+        PoolId poolId,
+        uint256 amountNo
+    ) public {
+        uint256 price = calculateYesPrice(poolId);
+        uint256 amountYes = (amountNo * price) / 1e18;
+
+        noToken.burn(address(this), amountNo); // Burn from the pool
+        yesToken.mint(address(this), amountYes); // Mint to the pool
+
+        if (userNoBalances[poolId][sender] == 0) {
+            noTokenHolders[poolId].push(sender);
+        }
+        if (userYesBalances[poolId][sender] == 0) {
+            yesTokenHolders[poolId].push(sender);
+        }
+
+        noBalances[poolId] -= amountNo;
+        userNoBalances[poolId][sender] -= amountNo;
+
+        yesBalances[poolId] += amountYes;
+        userYesBalances[poolId][sender] += amountYes;
+    }
+
+    function afterSwap(
+        address,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata,
+        BalanceDelta,
+        bytes calldata
+    ) external override returns (bytes4, int128) {
+        // Custom logic for after swap if needed
+        return (BaseHook.afterSwap.selector, 0);
+    }
+
     function afterAddLiquidity(
         address sender,
         PoolKey calldata key,
@@ -227,16 +288,5 @@ contract PredictionMarketHook is BaseHook {
         uint256 liquidityAdded = uint256(params.liquidityDelta);
         liquidityPoints[sender] += liquidityAdded; // Award 1 point for each wei of liquidity added
         return (BaseHook.afterAddLiquidity.selector, delta);
-    }
-
-    function afterSwap(
-        address,
-        PoolKey calldata key,
-        IPoolManager.SwapParams calldata,
-        BalanceDelta,
-        bytes calldata
-    ) external override returns (bytes4, int128) {
-        // Custom logic for after swap if needed
-        return (BaseHook.afterSwap.selector, 0);
     }
 }

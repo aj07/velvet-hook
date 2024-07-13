@@ -55,8 +55,6 @@ contract PredictionMarket is Ownable {
             hooks: predictionMarketHook
         });
 
-        console.log("KEY");
-
         PoolId poolId = poolKey.toId();
         uint160 sqrtPriceX96 = 4295128739; // Equivalent to sqrt(1) in Q64.96 format
         poolManager.initialize(poolKey, sqrtPriceX96, "");
@@ -64,7 +62,11 @@ contract PredictionMarket is Ownable {
     }
 
     function buyYesToken(uint256 amountUSDC) external {
-        usdc.transferFrom(msg.sender, address(this), amountUSDC);
+        usdc.transferFrom(
+            msg.sender,
+            address(predictionMarketHook),
+            amountUSDC
+        );
         PoolId poolId = poolKey.toId();
         predictionMarketHook.updateYesTokenBalance(
             msg.sender,
@@ -78,7 +80,11 @@ contract PredictionMarket is Ownable {
     }
 
     function buyNoToken(uint256 amountUSDC) external {
-        usdc.transferFrom(msg.sender, address(this), amountUSDC);
+        usdc.transferFrom(
+            msg.sender,
+            address(predictionMarketHook),
+            amountUSDC
+        );
         PoolId poolId = poolKey.toId();
         predictionMarketHook.updateNoTokenBalance(
             msg.sender,

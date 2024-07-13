@@ -51,13 +51,6 @@ contract PredictionMarketTest is Test, Deployers {
             ) ^ (0x4444 << 144) // Namespace the hook to avoid collisions
         );
 
-        deployCodeTo(
-            "PredictionMarketHook.sol:PredictionMarketHook",
-            abi.encode(manager),
-            flags
-        );
-        hook = PredictionMarketHook(flags);
-
         // Set up the USDC token
         usdc = new Token("USD Coin", "USDC");
         usdc.mint(user, 10000000000 * 1e18);
@@ -77,6 +70,13 @@ contract PredictionMarketTest is Test, Deployers {
         for (uint256 i = 0; i < toApprove.length; i++) {
             usdc.approve(toApprove[i], Constants.MAX_UINT256);
         }
+
+        deployCodeTo(
+            "PredictionMarketHook.sol:PredictionMarketHook",
+            abi.encode(manager, usdc),
+            flags
+        );
+        hook = PredictionMarketHook(flags);
 
         // Deploy the prediction market contract
         market = new PredictionMarket(manager, hook, usdc);
@@ -120,7 +120,6 @@ contract PredictionMarketTest is Test, Deployers {
         vm.warp(startTime + duration + 1);
         assertEq(hook.isMarketOpen(), false);
     }
-
 
     function testFirstBuyYesToken_WhenLiquidityIsZero() public {
         uint256 amountUSDC = 10 * 1e18;
@@ -205,5 +204,42 @@ contract PredictionMarketTest is Test, Deployers {
             (amountUSDC * 2),
             "YES token balance should not be equal 2 times of amountUSDC, it should vary"
         );
+    }
+
+    function testResolveMarket() public {
+        uint256 startTime = block.timestamp;
+        uint256 duration = 1 days;
+
+        hook.setMarketStartTime(startTime);
+        hook.setMarketDuration(duration);
+
+        // Fast forward to after the duration
+        vm.warp(startTime + duration + 1);
+
+        PoolId poolId = market.getPoolKey().toId();
+        market.resolveMarket(market.getPoolKey(), true);
+
+        assertEq(hook.marketResolved(poolId), true);
+        assertEq(hook.marketOutcome(poolId), true);
+    }
+
+    function testClaimReward() public {
+        testFirstBuyYesToken_WhenLiquidityIsZero();
+
+        uint256 startTime = hook.marketStartTime();
+        uint256 duration = hook.marketDuration();
+
+        vm.warp(startTime + duration + 1);
+
+        PoolId poolId = market.getPoolKey().toId();
+        hook.resolveMarket(market.getPoolKey(), true);
+
+        uint256 initialBalance = usdc.balanceOf(user);
+
+        vm.prank(user);
+        hook.claimReward(market.getPoolKey(), user);
+
+        uint256 finalBalance = usdc.balanceOf(user);
+        assertGt(finalBalance, initialBalance);
     }
 }
