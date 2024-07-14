@@ -164,7 +164,6 @@ contract PredictionMarketHook is BaseHook {
         yesBalances[poolId] += amountYes;
         userYesBalances[poolId][sender] += amountYes;
         yesToken.mint(address(this), amountYes); // Mint to the pool
-        donateTokensToPool(key, amountYes, 0); // Donate YES tokens to the pool
     }
 
     /**
@@ -191,25 +190,8 @@ contract PredictionMarketHook is BaseHook {
         noBalances[poolId] += amountNo;
         userNoBalances[poolId][sender] += amountNo;
         noToken.mint(address(this), amountNo); // Mint to the pool
-        donateTokensToPool(key, 0, amountNo); // Donate NO tokens to the pool
     }
 
-    /**
-     * @dev Donates tokens to the pool.
-     * @param key The pool key.
-     * @param amountYes The amount of YES tokens to donate.
-     * @param amountNo The amount of NO tokens to donate.
-     */
-    function donateTokensToPool(
-        PoolKey calldata key,
-        uint256 amountYes,
-        uint256 amountNo
-    ) internal {
-        yesToken.approve(address(poolManager), amountYes);
-        noToken.approve(address(poolManager), amountNo);
-
-        poolManager.donate(key, amountYes, amountNo, "");
-    }
 
     /**
      * @dev Resolves the market with the given outcome.
