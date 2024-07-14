@@ -1,8 +1,8 @@
-# Prediction Market using Uniswap V4 Custom Hooks
+# Prediction Market using V4 Custom Hooks
 
 ## Overview
 
-Our project leverages Uniswap V4 to create a sophisticated prediction market. Unlike traditional models, we employ a custom pricing algorithm to dynamically adjust the prices of "YES" and "NO" tokens based on their respective supplies and the total USDC balance in the pool. This ensures that prices remain positive and reflect the current market dynamics. The project also integrates with Uniswap V4's `PoolManager` to manage the prediction market pools, providing a flexible and modular design that can be extended and customized by developers.
+Our project leverages V4 to create a sophisticated prediction market. Unlike traditional models, we employ a custom pricing algorithm to dynamically adjust the prices of "YES" and "NO" tokens based on their respective supplies and the total USDC balance in the pool. This ensures that prices remain positive and reflect the current market dynamics. The project also integrates with V4's `PoolManager` to manage the prediction market pools, providing a flexible and modular design that can be extended and customized by developers.
 
 ## Key Features
 
@@ -13,11 +13,11 @@ Our project replaces the v3 concentrated liquidity model with a custom pricing a
 #### Implementation Details
 
 - **Dynamic Pricing Calculation:** The prices of "YES" and "NO" tokens are recalculated based on their respective supplies and the USDC balance. This ensures that prices remain positive and reflect the current market dynamics.
-- **Custom Hooks:** The custom curve is implemented using Uniswap V4 hooks, specifically the `beforeSwap` and `afterSwap` hooks, to enforce the custom pricing rules and manage token balances within the pool.
+- **Custom Hooks:** The custom curve is implemented using V4 hooks, specifically the `beforeSwap` and `afterSwap` hooks, to enforce the custom pricing rules and manage token balances within the pool.
 
 ### Pool Operators (Periphery)
 
-Our contracts interact with the Uniswap V4 `PoolManager` to manage the prediction market pools. The `PredictionMarket` contract serves as a pool operator, handling the creation and management of pools for the "YES" and "NO" tokens. It utilizes the `PoolManager` to initialize pools, update token balances, and resolve markets based on the outcomes.
+Our contracts interact with the V4 `PoolManager` to manage the prediction market pools. The `PredictionMarket` contract serves as a pool operator, handling the creation and management of pools for the "YES" and "NO" tokens. It utilizes the `PoolManager` to initialize pools, update token balances, and resolve markets based on the outcomes.
 
 #### Implementation Details
 
@@ -26,7 +26,7 @@ Our contracts interact with the Uniswap V4 `PoolManager` to manage the predictio
 
 ### Infrastructure / SDKs / Developer Tooling
 
-Our project leverages the infrastructure provided by Uniswap V4 to build a sophisticated prediction market. The use of custom hooks and the `PoolManager` enables developers to create and manage prediction markets with custom behaviors and pricing algorithms.
+Our project leverages the infrastructure provided by V4 to build a sophisticated prediction market. The use of custom hooks and the `PoolManager` enables developers to create and manage prediction markets with custom behaviors and pricing algorithms.
 
 #### Implementation Details
 
@@ -48,7 +48,7 @@ Our project leverages the infrastructure provided by Uniswap V4 to build a sophi
 
 ### Infrastructure / SDKs / Developer Tooling
 
-- Leveraged Uniswap V4 infrastructure to build the prediction market.
+- Leveraged V4 infrastructure to build the prediction market.
 - Designed contracts with modularity for easy extension and customization.
 - Provided comprehensive unit tests to validate functionality and serve as a resource for developers.
 
@@ -58,14 +58,14 @@ Our project leverages the infrastructure provided by Uniswap V4 to build a sophi
 
 This contract initializes the prediction market, manages token purchases, and resolves the market. Key functions include:
 
-- **initializeMarket:** Initializes the market by deploying the "YES" and "NO" tokens and setting up the Uniswap V4 pool.
+- **initializeMarket:** Initializes the market by deploying the "YES" and "NO" tokens and setting up the V4 pool.
 - **buyYesToken:** Allows users to buy "YES" tokens using USDC.
 - **buyNoToken:** Allows users to buy "NO" tokens using USDC.
 - **resolveMarket:** Resolves the market based on the event's outcome.
 
 ### PredictionMarketHook.sol
 
-This contract implements the custom logic for the prediction market using Uniswap V4 hooks. Key functions include:
+This contract implements the custom logic for the prediction market using V4 hooks. Key functions include:
 
 - **deployTokens:** Deploys the "YES" and "NO" tokens.
 - **updateYesTokenBalance:** Updates the balance of "YES" tokens for a user.
@@ -75,20 +75,20 @@ This contract implements the custom logic for the prediction market using Uniswa
 
 ## Why It's Different from Polymarket
 
-Polymarket is a well-known prediction market platform that allows users to bet on the outcomes of various events. While Polymarket is a centralized platform, our implementation leverages the decentralized nature of Uniswap V4 and its innovative hook system. Here are the key differences:
+Polymarket is a well-known prediction market platform that allows users to bet on the outcomes of various events. While Polymarket is a centralized platform, our implementation leverages the decentralized nature of V4 and its innovative hook system. Here are the key differences:
 
 - **Decentralization:** Unlike Polymarket, which relies on a central authority to manage markets and outcomes, this implementation is entirely decentralized, with all operations handled by smart contracts on the Ethereum blockchain.
-- **Custom Hooks:** By using Uniswap V4 hooks, we can integrate custom logic directly into the liquidity pool operations. This allows for unique behaviors such as dynamic pricing and custom reward mechanisms that are not possible with standard Uniswap V3 or other decentralized exchanges.
+- **Custom Hooks:** By using V4 hooks, we can integrate custom logic directly into the liquidity pool operations. This allows for unique behaviors such as dynamic pricing and custom reward mechanisms that are not possible with standard V3 or other decentralized exchanges.
 - **Dynamic Pricing:** The prices of "YES" and "NO" tokens are dynamically determined based on the liquidity and trading activity in the pool. This ensures that the token prices always reflect the current market sentiment.
 - **Automated Market Resolution:** The resolution of the market and distribution of rewards are automated through smart contracts, eliminating the need for manual intervention and reducing the risk of manipulation.
 
-## Why Uniswap V4 and Not V2 or V3
+## Why V4 and Not V2 or V3
 
-Uniswap V4 introduces a powerful new feature called hooks, which are not available in Uniswap V2 or V3. Hooks allow developers to inject custom logic into the liquidity pool operations, enabling advanced functionalities such as dynamic pricing, custom fee structures, and bespoke trading rules. Here’s why this prediction market implementation is possible in Uniswap V4 but not in V2 or V3:
+V4 introduces a powerful new feature called hooks, which are not available in V2 or V3. Hooks allow developers to inject custom logic into the liquidity pool operations, enabling advanced functionalities such as dynamic pricing, custom fee structures, and bespoke trading rules. Here’s why this prediction market implementation is possible in V4 but not in V2 or V3:
 
-- **Custom Hooks:** Uniswap V4's hook system allows for the creation of custom pre- and post-swap logic. This capability is crucial for implementing the dynamic pricing and market resolution mechanisms required for a prediction market. Uniswap V2 and V3 do not support such custom hooks, limiting their flexibility.
-- **Enhanced Flexibility:** The hooks in Uniswap V4 provide a level of flexibility that allows developers to create entirely new types of financial instruments and markets. This prediction market leverages hooks to manage token minting, burning, and price calculations based on market conditions, which would be impossible in the more rigid frameworks of V2 and V3.
-- **Direct Integration with Liquidity Pools:** Uniswap V4's hooks allow direct interaction with liquidity pool balances before and after swaps. This direct integration is essential for dynamically adjusting token prices and managing user balances in real-time, ensuring that the prediction market remains accurate and fair.
+- **Custom Hooks:** V4's hook system allows for the creation of custom pre- and post-swap logic. This capability is crucial for implementing the dynamic pricing and market resolution mechanisms required for a prediction market. V2 and V3 do not support such custom hooks, limiting their flexibility.
+- **Enhanced Flexibility:** The hooks in V4 provide a level of flexibility that allows developers to create entirely new types of financial instruments and markets. This prediction market leverages hooks to manage token minting, burning, and price calculations based on market conditions, which would be impossible in the more rigid frameworks of V2 and V3.
+- **Direct Integration with Liquidity Pools:** V4's hooks allow direct interaction with liquidity pool balances before and after swaps. This direct integration is essential for dynamically adjusting token prices and managing user balances in real-time, ensuring that the prediction market remains accurate and fair.
 
 ## Example Use Cases
 
@@ -113,34 +113,42 @@ Developers can extend the functionality by adding new hooks or integrating with 
 ### Installation
 
 1. Clone the repository:
-
 ```
 git clone the repo
 cd {FolderName}
-Install dependencies:
-
-Copy code
-forge install
-Running Tests
-Build the project:
-
-Copy code
-forge build
-Run the tests:
-
-Copy code
-forge test
-Test Cases
-The test cases are implemented in test/PredictionMarketHook.t.sol. Here is a brief overview of the test cases:
-
-testSetMarketDuration: Tests setting the market duration.
-testSetMarketStartTime: Tests setting the market start time.
-testMarketIsOpen: Tests if the market is open during the expected time frame.
-testBuyYesTokenWhenPriceIsEqual: Tests buying "YES" tokens when the price is equal.
-testBuyNoTokenWhenPriceIsEqual: Tests buying "NO" tokens when the price is equal.
-testResolveMarket: Tests resolving the market.
-testClaimReward: Tests claiming the reward.
-testBuyAndClaimAfterMarketResolution: Tests buying tokens and claiming the reward after market resolution.
-test_User2InvestsInYesAndNoTokens: Tests user2 investing in both "YES" and "NO" tokens and claiming rewards.
-test_MultipleUsersInvestAndClaim: Tests multiple users investing and claiming their share based on the market outcome.
 ```
+
+1. Install dependencies:
+```
+forge install
+
+```
+
+### Running Tests
+
+1. Build the project:
+
+```
+forge build
+
+```
+1. Run the tests:
+
+```
+forge test
+```
+
+### Test Cases
+
+The test cases are implemented in `test/PredictionMarketHook.t.sol`. Here is a brief overview of the test cases:
+
+- **testSetMarketDuration**: Tests setting the market duration.
+- **testSetMarketStartTime**: Tests setting the market start time.
+- **testMarketIsOpen**: Tests if the market is open during the expected time frame.
+- **testBuyYesTokenWhenPriceIsEqual**: Tests buying "YES" tokens when the price is equal.
+- **testBuyNoTokenWhenPriceIsEqual**: Tests buying "NO" tokens when the price is equal.
+- **testResolveMarket**: Tests resolving the market.
+- **testClaimReward**: Tests claiming the reward.
+- **testBuyAndClaimAfterMarketResolution**: Tests buying tokens and claiming the reward after market resolution.
+- **test_User2InvestsInYesAndNoTokens**: Tests user2 investing in both "YES" and "NO" tokens and claiming rewards.
+- **test_MultipleUsersInvestAndClaim**: Tests multiple users investing and claiming their share based on the market outcome.
