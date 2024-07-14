@@ -104,7 +104,7 @@ contract PredictionMarketTest is Test, Deployers {
 
         key = market.getPoolKey();
 
-        // Provide full-range liquidity to the pool
+        // Provide initial liquidity to pool
         modifyLiquidityRouter.modifyLiquidity(
             key,
             IPoolManager.ModifyLiquidityParams(
