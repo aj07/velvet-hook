@@ -70,6 +70,7 @@ contract PredictionMarketTest is Test, Deployers {
             address(nestedActionRouter.executor())
         ];
 
+        //Approving All Routes
         for (uint256 i = 0; i < toApprove.length; i++) {
             usdc.approve(toApprove[i], Constants.MAX_UINT256);
         }
@@ -102,9 +103,10 @@ contract PredictionMarketTest is Test, Deployers {
             noToken.approve(toApprove[i], Constants.MAX_UINT256);
         }
 
+        //To Get Market Key
         key = market.getPoolKey();
 
-        // Provide full-range liquidity to the pool
+        // Provide initial liquidity to pool
         modifyLiquidityRouter.modifyLiquidity(
             key,
             IPoolManager.ModifyLiquidityParams(
